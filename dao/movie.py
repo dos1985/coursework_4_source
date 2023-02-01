@@ -9,7 +9,7 @@ class MovieDAO:
             query = query.order_by(Movie.created_at.desc())
         if page:
             query = query.paginate(page, per_page, False)
-        return query.items
+        return query.all()
 
     def __init__(self, session):
         self.session = session

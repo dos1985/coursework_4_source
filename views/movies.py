@@ -1,7 +1,7 @@
 from flask import request
 from flask_restx import Resource, Namespace
 from jsonschema.cli import parser
-
+from flask_restx import Namespace, Resource, fields, reqparse
 from dao.model.movie import MovieSchema
 from implemented import movie_service
 from flask_restx import Namespace, Resource, fields
@@ -9,20 +9,25 @@ from service.movie import MovieService
 
 movie_ns = Namespace('movies', description='Movies operations')
 
-movie_model = movie_ns.model('Movie', {
-    'id': fields.Integer(readOnly=True, description='The movie identifier'),
-    'name': fields.String(required=True, description='The movie name'),
-    # ... other fields ...
-})
+# movie_model = movie_ns.model('Movie', {
+#     'id': fields.Integer(readOnly=True, description='The movie identifier'),
+#     'name': fields.String(required=True, description='The movie name'),
+#     # ... other fields ...
+# })
 
 @movie_ns.route('/')
 class MoviesView(Resource):
     @movie_ns.doc('list_movies')
-    @movie_ns.marshal_list_with(movie_model)
     def get(self):
-        """List all movies"""
+        parser = reqparse.RequestParser()
+        parser.add_argument('status', type=str, required=False)
         args = parser.parse_args()
-        return MovieService.get_movies(args['status']
+
+        status = args.get('status')
+        if status and status == 'new':
+            return sorted(MovieService.get_movies(), key=lambda x: x['release_date'], reverse=True)
+        else:
+            return MovieService.get_movies()
 
 # class MoviesView(Resource):
 #     def get(self):
