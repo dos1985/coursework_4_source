@@ -1,26 +1,42 @@
 from flask import request
 from flask_restx import Resource, Namespace
+from jsonschema.cli import parser
 
 from dao.model.movie import MovieSchema
 from implemented import movie_service
+from flask_restx import Namespace, Resource, fields
+from service.movie import MovieService
 
-movie_ns = Namespace('movies')
+movie_ns = Namespace('movies', description='Movies operations')
 
+movie_model = movie_ns.model('Movie', {
+    'id': fields.Integer(readOnly=True, description='The movie identifier'),
+    'name': fields.String(required=True, description='The movie name'),
+    # ... other fields ...
+})
 
 @movie_ns.route('/')
 class MoviesView(Resource):
+    @movie_ns.doc('list_movies')
+    @movie_ns.marshal_list_with(movie_model)
     def get(self):
-        director = request.args.get("director_id")
-        genre = request.args.get("genre_id")
-        year = request.args.get("year")
-        filters = {
-            "director_id": director,
-            "genre_id": genre,
-            "year": year,
-        }
-        all_movies = movie_service.get_all(filters)
-        res = MovieSchema(many=True).dump(all_movies)
-        return res, 200
+        """List all movies"""
+        args = parser.parse_args()
+        return MovieService.get_movies(args['status']
+
+# class MoviesView(Resource):
+#     def get(self):
+#         director = request.args.get("director_id")
+#         genre = request.args.get("genre_id")
+#         year = request.args.get("year")
+#         filters = {
+#             "director_id": director,
+#             "genre_id": genre,
+#             "year": year,
+#         }
+#         all_movies = movie_service.get_all(filters)
+#         res = MovieSchema(many=True).dump(all_movies)
+#         return res, 200
 
     def post(self):
         req_json = request.json
