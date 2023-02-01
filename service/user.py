@@ -1,16 +1,12 @@
-import calendar
 import datetime
-import base64
 import hashlib
-import hmac
-from typing import Dict, Any, List
+import calendar
 
 import jwt
 
-from config import Config
-from dao.model.user import User
-
 from dao.user import UserDAO
+from constants import PWD_HASH_SALT, PWD_HASH_ITERATIONS
+
 
 
 class UserService:
@@ -48,27 +44,53 @@ class UserService:
     def delete(self, user_id: int) -> None:
         self.dao.delete(user_id)
 
-    def encode_password(self, password: str) -> str:
-        return base64.b64encode(hashlib.pbkdf2_hmac(
+
+    def get_hash(self, password):
+        return hashlib.pbkdf2_hmac(
             'sha256',
-            password.encode('utf-8'),
-            Config.PWD_HASH_SALT, Config.PWD_HASH_ITERATIONS
-        )).decode("utf-8")
+            password.encode('utf-8'),  # Convert the password to bytes
+            PWD_HASH_SALT,
+            PWD_HASH_ITERATIONS
+        ).decode("utf-8", "ignore")
 
-    def compare_passwords(self, password_hash: str, other_password: str) -> bool:
+    def get_tokens(self, data):
+        date_time = datetime.datetime.utcnow()
 
-        return hmac.compare_digest(
-            base64.b64decode(password_hash.encode('utf-8')),
-            hashlib.pbkdf2_hmac('sha256', other_password.encode('utf-8'),
-                                Config.PWD_HASH_SALT, Config.PWD_HASH_ITERATIONS)
-        )
-
-    def generate_access_token(self, data: Dict[str, Any]) -> str:
-        min30: datetime.datetime = datetime.datetime.utcnow() + datetime.timedelta(minutes=30)
+        min30 = date_time + datetime.timedelta(minutes=30)
         data["exp"] = calendar.timegm(min30.timetuple())
-        return jwt.encode(data, Config.JWT_SECRET, algorithm=Config.JWT_ALGO)
+        access_token = jwt.encode(data, PWD_HASH_SALT, algorithm='HS256')
 
-    def generate_refresh_token(self, data: Dict[str, Any]) -> str:
-        day130: datetime.datetime = datetime.datetime.utcnow() + datetime.timedelta(days=130)
-        data["exp"] = calendar.timegm(day130.timetuple())
-        return jwt.encode(data, Config.JWT_SECRET, algorithm=Config.JWT_ALGO)
+        days130 = date_time + datetime.timedelta(days=130)
+        data["exp"] = calendar.timegm(days130.timetuple())
+        refresh_token = jwt.encode(data, PWD_HASH_SALT, algorithm='HS256')
+        tokens = {"access_token": access_token, "refresh_token": refresh_token}
+
+        return tokens
+
+    def auth_user(self, email, password):
+        user = self.dao.get_one_by_email(email)
+        if not user:
+            return "Нет пользователя с таким логином", 401
+
+        passwd_new = self.get_hash(password)
+        if passwd_new != user.password:
+            return "Неверный пароль", 401
+
+        data = {
+            "email": user.email
+        }
+        return self.get_tokens(data)
+
+    def check_token(self, token):
+        try:
+            data = jwt.decode(token, PWD_HASH_SALT, algorithms='HS256')
+            return self.get_tokens(data)
+        except Exception as e:
+            raise e
+
+    def check_password(self, email, password):
+        user = self.dao.get_one_by_email(email)
+        passwd_new = self.get_hash(password)
+        if passwd_new != user.password:
+            return "Неверный старый пароль", 401
+        return True
