@@ -14,6 +14,9 @@ class UserDAO:
     def get_one(self, uid: int) -> User:
         return self.session.query(User).get(uid)
 
+    def get_one_by_email(self, email):
+        return self.session.query(User).filter(User.email == email).one_or_none()
+
     def get_by_name(self, username: str) -> User:
         return self.session.query(User).filter(User.username == username).one()
 
@@ -34,3 +37,4 @@ class UserDAO:
         self.session.add(user_by_id)
         self.session.commit()
         return user_by_id
+

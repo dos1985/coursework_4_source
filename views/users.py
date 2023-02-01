@@ -1,45 +1,56 @@
-from typing import Dict, Tuple, Any, List
-
+# Представление для пользователя
 from flask import request
 from flask_restx import Resource, Namespace
 
-from dao.model.user import UserSchema, User
-from decorator import admin_required
+from dao.model.user import UserSchema
 from implemented import user_service
+from utils import auth_required, get_email
 
-user_ns: Namespace = Namespace('users')
-user_schema: UserSchema = UserSchema()
-users_schema: UserSchema = UserSchema(many=True)
+algo = 'HS256'
+user_ns = Namespace('user')
 
 
 @user_ns.route('/')
 class UsersView(Resource):
+    """Класс пользователей"""
+    @auth_required
+    def get(self):
+        """
+        Вывод профиля пользователя
+        """
+        email = get_email()
+        rs = user_service.get_one(email)
+        res = UserSchema().dump(rs)
+        return res, 200
 
-    @admin_required
-    def get(self) -> Tuple[List[Dict[str, Any]], int]:
-        all_users: List[User] = user_service.get_all()
-        return users_schema.dump(all_users), 200
+    @auth_required
+    def patch(self):
+        """
+        Обновление профиля пользователя
+        """
+        req_json = request.json
+        email = get_email()
+        rs = user_service.get_one(email)
+        if "id" not in req_json:
+            req_json["id"] = rs.id
+        user_service.update(req_json)
+        return "", 200
 
-    def post(self) -> Tuple[str, int, Dict[str, str]]:
-        req_json: Dict[str, Any] = request.json
-        user: User = user_service.create(req_json)
-        return "", 201, {"location": f"/users/{user.id}"}
 
-
-@user_ns.route('/<int:uid>')
+@user_ns.route('/password/')
 class UserView(Resource):
-    @admin_required
-    def get(self, uid: int) -> Tuple[Dict[str, Any], int]:
-        user: User = user_service.get_one(uid)
-        return user_schema.dump(user), 200
+    @auth_required
+    def put(self):
+        """Обновление пароля"""
+        req_json = request.json
+        password_1 = req_json['old_password']
+        password_2 = req_json['new_password']
+        email = get_email()
+        if user_service.check_password(email, password_1):
+            passwd_new = user_service.get_hash(password_2)
+            rs = user_service.get_one(email)
+            data = {'id': rs.id, 'password': passwd_new}
+            user_service.update(data)
+        return "", 200
 
-    @admin_required
-    def put(self, uid: int) -> Tuple[str, int]:
-        req_json: Dict[str, Any] = request.json
-        user_service.update(uid, req_json)
-        return "", 204
 
-    @admin_required
-    def delete(self, uid: int) -> Tuple[str, int]:
-        user_service.delete(uid)
-        return "", 204

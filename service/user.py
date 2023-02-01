@@ -4,46 +4,32 @@ import calendar
 
 import jwt
 
-from dao.user import UserDAO
+from dao.user import UserDAO, User
 from constants import PWD_HASH_SALT, PWD_HASH_ITERATIONS
 
 
-
 class UserService:
-    dao: UserDAO
-
-    def __init__(self, dao: UserDAO) -> None:
+    def __init__(self, dao: UserDAO):
         self.dao = dao
 
-    def get_one(self, user_id: int) -> User:
-        return self.dao.get_one(user_id)
+    def get_one(self, email):
+        return self.dao.get_one_by_email(email)
 
-    def get_by_name(self, username: str) -> User:
-        return self.dao.get_by_name(username)
-
-    def get_all(self) -> List[User]:
+    def get_all(self):
         return self.dao.get_all()
 
-    def update(self, user_id: int, data: Dict[str, Any]) -> User:
-        user_by_id: User = self.dao.get_one(user_id)
-        for k, v in data.items():
-            if k == "password":
-                setattr(user_by_id, k, self.encode_password(v))
-            else:
-                setattr(user_by_id, k, v)
-        return self.dao.update(user_by_id)
+    def create(self, user_d):
+        user_object = User(**user_d)
+        user_object.password = self.get_hash(user_object.password)
+        return self.dao.create(user_object)
 
-    def create(self, data: Dict[str, Any]) -> User:
 
-        encoded_password: str = self.encode_password(data['password'])
-        data['password'] = encoded_password
+    def update(self, user_d):
+        self.dao.update(user_d)
+        return self.dao
 
-        user: User = User(**data)
-        return self.dao.create(user)
-
-    def delete(self, user_id: int) -> None:
-        self.dao.delete(user_id)
-
+    def delete(self, rid):
+        self.dao.delete(rid)
 
     def get_hash(self, password):
         return hashlib.pbkdf2_hmac(
